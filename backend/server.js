@@ -8,6 +8,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 
 const connectDB = require("./config/db");
+const authRoutes = require("./routes/authRoutes");
 
 //Connect MongoDB
 connectDB();
@@ -18,6 +19,8 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 app.use(helmet());
+
+app.use("/api/auth", authRoutes);
 
 app.get("/", (req, res) => {
   res.send("IntellMeet Backend Running");
