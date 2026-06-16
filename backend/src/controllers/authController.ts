@@ -1,18 +1,23 @@
-const User = require("../models/User");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+import { Request, Response } from "express";
+import User from "../models/User";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
-//REGISTER
-const register = async (req, res) => {
+// REGISTER
+export const register = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { name, email, password } = req.body;
 
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      return res.status(400).json({
+      res.status(400).json({
         message: "User already exists",
       });
+      return;
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -27,24 +32,28 @@ const register = async (req, res) => {
       message: "User registered successfully",
       user,
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       message: error.message,
     });
   }
 };
 
-//LOGIN
-const login = async (req, res) => {
+// LOGIN
+export const login = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user: any = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({
+      res.status(400).json({
         message: "Invalid credentials",
       });
+      return;
     }
 
     const isMatch = await bcrypt.compare(
@@ -53,20 +62,20 @@ const login = async (req, res) => {
     );
 
     if (!isMatch) {
-      return res.status(400).json({
+      res.status(400).json({
         message: "Invalid credentials",
       });
+      return;
     }
 
     const token = jwt.sign(
       { id: user._id },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET as string,
       {
         expiresIn: "7d",
       }
     );
 
-   
     res.json({
       token,
       user: {
@@ -76,28 +85,26 @@ const login = async (req, res) => {
         role: user.role,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       message: error.message,
     });
   }
 };
 
- //GETPROFILE
-  const getProfile = async (req, res) => {
-    try{
-      const user = await User.findById(req.user.id)
+// GET PROFILE
+export const getProfile = async (
+  req: any,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = await User.findById(req.user.id)
       .select("-password");
 
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({
-        message: error.message,
-      });
-    }
+    res.json(user);
+  } catch (error: any) {
+    res.status(500).json({
+      message: error.message,
+    });
   }
-module.exports = {
-  register,
-  login,
-  getProfile,
 };
