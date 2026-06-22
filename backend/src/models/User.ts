@@ -18,10 +18,21 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
+    role: {
+      type: String,
+      required: true,
+    },
+
+    avatar: {
+      type: String,
+      default: "",
+    },
+    
     refreshToken: {
       type: String,
     },
   },
+
   {
     timestamps: true,
   }

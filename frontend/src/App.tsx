@@ -1,16 +1,43 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-
+import { Button } from "./components/ui/button";
+import Meetings from "./pages/Meetings";
+import VideoCall  from "./pages/VideoCall";
+import MeetingHistory from "./pages/MeetingHistory";
 
 function App() {
   return (
+    <>
+    <div className="p-10">
+      <Button>Create Meeting</Button>
+    </div>
+  
     <BrowserRouter>
     <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-    </Routes>
+
+      {/* Default Route */}
+      <Route path="/" element={<Navigate to="/Login" />} />
+
+      {/* Public Route */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Protected Route */}
+      <Route path="/dashboard" element={<Dashboard />}
+      />
+      
+      <Route path="/meetings" element={<Meetings />} 
+      />
+
+      <Route path="/call/:meetingCode" element={<VideoCall />}
+      />
+
+      <Route path="/history" element={<MeetingHistory />} 
+      />
+
+      </Routes>
     </BrowserRouter>
+  </>
   );
 
 }
