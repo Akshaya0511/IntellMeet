@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import http from "http";
-import connectDB from "./config/db";
+import connectDB from "./config/database";
 import { initSocket } from "./sockets/socket";
 import redisClient from "./config/redis";
 import app from "./app";
@@ -13,6 +13,7 @@ import cors from "cors";
 import meetingRoutes from "./routes/meetingRoutes";
 
 import authRoutes from "./routes/authRoutes";
+import taskRoutes from "./routes/project/taskRoutes";
 
 
 // ADD CORS
@@ -38,6 +39,7 @@ app.use("/api/meetings", meetingRoutes);
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/tasks", taskRoutes);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.log(err);

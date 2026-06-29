@@ -1,8 +1,15 @@
-import { Request, Response, NextFunction, ErrorRequestHandler  } from "express";
-import jwt, { Jwt, JwtPayload } from "jsonwebtoken";
+import { Request, Response, NextFunction  } from "express";
+import jwt, { JwtPayload } from "jsonwebtoken";
+
+
+
+interface JwtUser extends JwtPayload {
+  userid: string;
+  role?: string;
+}
 
 interface AuthRequest extends Request {
-  user?: string | JwtPayload;
+  user?: JwtUser;
 }
 
 const protect = (
@@ -19,27 +26,24 @@ const protect = (
       });
       return;
     }
+       const token = authHeader.split(" ")[1];
 
-    const token = authHeader.split(" ")[1];
+       const decoded = jwt.verify(
+         token,
+         process.env.JWT_SECRET as string
+      ) as JwtUser;
 
-    console.log("AUTH HEADER:", authHeader);
-    console.log("TOKEN RECEIVED:", token);
-    console.log("JWT_SECRET:", process.env.JWT_SECRET);
+      req.user = decoded;
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    ) as JwtPayload;
-
-    req.user = decoded;
-
-    next();
-  } catch (error) {
-    console.log("JWT ERROR:", error);
-    res.status(401).json({
-      message: "Invalid token",
+      next();
+     } catch (error) {
+        res.status(401).json({
+        message: "Invalid token",
     });
+     return;
   }
 };
 
 export default protect;
+
+   

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { Video, Copy, Trash2, LogIn } from "lucide-react";
+import { Button } from "../components/ui/button";
 
 interface Meeting {
   _id: string;
@@ -81,8 +83,10 @@ const Meetings = () => {
 
   //UI
   return (
-  <div style={styles.container}>
-    <h1>Meetings</h1>
+  <div className="max-w-6xl mx-auto p-8">
+    <h1 className="text-4xl font-bold mb-6">
+      Meetings
+    </h1>
 
     <div style={styles.createBox}>
       <input
@@ -93,12 +97,10 @@ const Meetings = () => {
         style={styles.input}
       />
 
-      <button
-        onClick={createMeeting}
-        style={styles.button}
-      >
+      <Button onClick={createMeeting}>
+        <Video className="mr-2 h-4 w-4" />
         Create Meeting
-      </button>
+      </Button>
     </div>
 
     <h2>My Meetings</h2>
@@ -110,7 +112,16 @@ const Meetings = () => {
     {meetings.map((m) => (
       <div
         key={m._id}
-        style={styles.card}
+        className="
+          border
+          rounded-xl
+          p-5
+          shadow-sm
+          hover:shadow-lg
+          transition
+          bg-white
+          mb-4
+          "
       >
         <h3>{m.title}</h3>
 
@@ -119,34 +130,38 @@ const Meetings = () => {
         </p>
 
         <div style={styles.btnRow}>
-          <button
-            onClick={() =>
-              copyCode(m.meetingId)
-            }
-          >
-            Copy
-          </button>
+          <Button 
+            variant="outline"
+            onClick={() => copyCode(m.meetingId)}
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copy
+            </Button>
 
-          <button
+          <Button
+            variant="secondary"
             onClick={() => {
               localStorage.setItem(
                 "meetingMongoId",
                 m._id
               );
-            
+
               navigate(`/call/${m.meetingId}`);
             }}
-          >
-            Join
-          </button>
+            >
+              <LogIn className="mr-2 h-4 w-4" />
+              Join
+            </Button>
 
-          <button
-            onClick={() =>
-              deleteMeeting(m._id)
-            }
-          >
-            Delete
-          </button>
+            <Button
+              variant="outline"
+              onClick={() => deleteMeeting(m._id)} 
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+
+          
         </div>
       </div>
     ))}
@@ -189,6 +204,9 @@ const styles: any = {
     padding: "12px 20px",
     cursor: "pointer",
     borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
   },
 
   recentCard: {
@@ -204,4 +222,32 @@ const styles: any = {
     cursor: "pointer",
     borderRadius: "8px",
   },
+
+  creatorBox: {
+    display: "flex",
+    gap: "10px",
+    marginBottom: "20px",
+  },
+
+  input: {
+    flex: 1,
+    padding: "12px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+  },
+
+  card: {
+    border: "1px solid #ddd",
+    borderRadius: "10px",
+    padding: "20px",
+    marginBottom: "15px",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+  },
+
+  btnRow: {
+    display: "flex",
+    gap: "10px",
+    marginTop: "10px",
+  },
+
 };

@@ -22,8 +22,13 @@ const VideoCall = () => {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const recordedChunksRef = useRef<Blob[]>([]);
     const [transcript, setTranscript] = useState("");
+    const [participants, setParticipants] = useState<string[]>([]);
+    const [notification, setNotification] = useState("");
+    const [typingUser, setTypingUser] = useState("");
+
 
     const [isRecording, setIsRecording] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
 
     const createPeerConnection = (roomId: string) => {
       peerRef.current =new RTCPeerConnection({
@@ -34,19 +39,39 @@ const VideoCall = () => {
         ],
       });
 
+      peerRef.current.oniceconnectionstatechange = () => {
+        console.log(
+          "ICE State:",
+          peerRef.current?.iceConnectionState
+        );
+      };
+
+      peerRef.current.onconnectionstatechange = () => {
+        console.log(
+          "Connection State:",
+          peerRef.current?.connectionState
+        );
+      };
+
       peerRef.current.ontrack = (event) => {
         console.log("Remote stream received");
-        console.log(event.streams);
 
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
+        const stream = event.streams[0];
+          
+        if (
+          remoteVideoRef.current && 
+          remoteVideoRef.current.srcObject !== stream
+        ) {
+          remoteVideoRef.current.srcObject = stream;
 
           remoteVideoRef.current.onloadedmetadata = () => {
-            console.log("Remote video metadata loaded");
-            remoteVideoRef.current?.play();
+            remoteVideoRef.current
+            ?.play()
+            .catch(console.error);
           };
         }
-      };
+        };
+
 
       peerRef.current.onicecandidate = (event) => {
         if (event.candidate) {
@@ -58,6 +83,7 @@ const VideoCall = () => {
       };
     };
 
+    //screenshare
     const startScreenShare = async () => {
       try {
         const screenStream = 
@@ -82,8 +108,19 @@ const VideoCall = () => {
         }
     };
 
+    //message
     const sendMessage = () => {
       if (!message.trim()) return;
+
+      const mentionMatch = 
+      message.match(/@(\w+)/);
+
+      if (mentionMatch) {
+        socket.emit(
+          "mention-user",
+          mentionMatch[1]
+        );
+      }
 
       socket.emit("chat-message", {
         roomId: meetingCode,
@@ -98,6 +135,7 @@ const VideoCall = () => {
       setMessage("");
     };
 
+    //Transcription
     const startTranscription = () => {
       const SpeechRecognition =
       window.SpeechRecognition ||
@@ -110,7 +148,7 @@ const VideoCall = () => {
 
       const recognition = new SpeechRecognition();
 
-      recognition.continuos = true;
+      recognition.continuous = true;
       recognition.interimResults = true;
 
       recognition.onresult = (event: any) => {
@@ -133,6 +171,7 @@ const VideoCall = () => {
       console.log("Transcription started");
     };
 
+    //start Record
     const startRecording = async () => {
       try {
         const stream = localVideoRef.current?.srcObject as MediaStream;
@@ -161,6 +200,7 @@ const VideoCall = () => {
       }
     };
 
+    //stop Record
     const stopRecording =() => {
       mediaRecorderRef.current?.stop();
 
@@ -168,7 +208,7 @@ const VideoCall = () => {
         const blob = new Blob(
           recordedChunksRef.current,
           {
-            type: "video/webcam",
+            type: "video/webm",
           }
         );
 
@@ -189,6 +229,30 @@ const VideoCall = () => {
       };
     };
 
+    // Mute
+    const toggleMute = () => {
+      const stream = 
+      localVideoRef.current?.srcObject as MediaStream;
+
+      if (!stream) return;
+
+      const audioTrack = stream
+        .getAudioTracks()[0];
+
+        if (!audioTrack) return;
+
+        audioTrack.enabled = 
+        !audioTrack.enabled;
+
+        setIsMuted(!audioTrack.enabled);
+
+        console.log(
+          audioTrack.enabled? "Microphone ON"
+          : "Microphone OFF"
+        );
+    };
+
+    // leave meeting
     const leaveMeeting = async () => {
       const transcript = messages.join(". ");
 
@@ -232,6 +296,18 @@ const VideoCall = () => {
       console.log("Summary error", err);
     } 
 
+    console.log("Leave Meeting clicked");
+
+    const employeeId = 
+      localStorage.getItem("employeeId") || "EMP001";
+     
+     console.log("Sending leave-room event");
+      
+     socket.emit("leave-room", {
+      roomId: meetingCode,
+      employeeId,
+     });
+
       peerRef.current?.close();
 
       const localStream =
@@ -259,10 +335,38 @@ const VideoCall = () => {
     useEffect(() => {
     if (!meetingCode) return;
 
+    socket.on(
+      "notification",
+      (message: string) => {
+
+        setNotification(message);
+
+        setTimeout(() => {
+          setNotification("");
+        }, 3000);
+      }
+    );
+
     // Join room
 
     socket.on("user-joined", async (id) => {
+      setNotification(`🟢 ${id.slice(0, 6)} joined`);
+
+      setTimeout(() => {
+        setNotification("");
+      }, 3000);
+
       console.log("User joined room:", id);
+
+      if (
+        peerRef.current?.signalingState != "stable"
+      ) {
+        console.log(
+          "Skipping offer - peer not stable"
+        );
+        return;
+      }
+
       console.log("Creating offer for:", id);
 
       if (!peerRef.current) return;
@@ -277,7 +381,16 @@ const VideoCall = () => {
       });
     });
 
+    // user left
     socket.on("user-left", (userId) => {
+      setNotification(
+        `🔴 ${userId.slice(0, 6)} left`
+      );
+
+      setTimeout(() => {
+        setNotification("");
+      }, 3000);
+
       console.log("User left:", userId);
 
       if (remoteVideoRef.current) {
@@ -285,10 +398,25 @@ const VideoCall = () => {
       }
     });
 
+    //offer
     socket.on("offer", async ({ offer }) => {
       console.log("Offer received");
       
       if(!peerRef.current) return;
+
+      console.log(
+        "Current state:",
+        peerRef.current.signalingState
+      );
+
+      if (
+        peerRef.current.signalingState !== "stable"
+      ) {
+        console.log(
+          "Ignoring duplicate offer"
+        );
+        return;
+      }
 
       await peerRef.current.setRemoteDescription(
         new RTCSessionDescription(offer)
@@ -304,8 +432,21 @@ const VideoCall = () => {
       });
     });
 
+    // answer
     socket.on("answer", async ({ answer }) => {
       console.log("Answer received");
+
+      if (!peerRef.current) return;
+
+      if (
+        peerRef.current.signalingState !==
+        "have-local-offer"
+      ) {
+        console.log(
+          "Ignoring duplicate answer"
+        );
+        return;
+      }
 
       await peerRef.current?.setRemoteDescription(
         new RTCSessionDescription(answer)
@@ -331,7 +472,25 @@ const VideoCall = () => {
        ]);
     });
 
+    socket.on("typing", (userId) => {
+      setTypingUser(`${userId} is typing...`);
 
+      setTimeout(() => {
+        setTypingUser("");
+      }, 1000);
+     });
+
+    socket.on("participants-update", (participantsList: string[]) => {
+        console.log("Participants:", participantsList);
+
+        setParticipants(
+          [...new Set(participantsList)]
+        );
+      }
+    );
+
+
+   // start camera
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -343,10 +502,20 @@ const VideoCall = () => {
           localVideoRef.current.srcObject = stream;
         }
 
-      // start camera
-      createPeerConnection(meetingCode);
+        createPeerConnection(meetingCode);
 
-      socket.emit("join-room", meetingCode);
+        stream.getTracks().forEach((track) => {
+          peerRef.current?.addTrack(track, stream);
+       });
+
+       const employeeId = 
+         localStorage.getItem("employeeId") || "EMP001";
+
+      socket.emit("join-room", {
+        roomId: meetingCode,
+        employeeId,
+      });
+        
       console.log("Joined room:", meetingCode);
 
       stream.getTracks().forEach((track) => {
@@ -362,11 +531,15 @@ const VideoCall = () => {
     startCamera();
 
     return () => {
+      socket.off("notification");
       socket.off("user-joined");
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
       socket.off("user-left");
+      socket.off("participants-update");
+      socket.off("chat-message");
+      socket.off("typing");
 
       peerRef.current?.close();
     };
@@ -377,8 +550,25 @@ const VideoCall = () => {
       <h1>Video Call Room</h1>
       <h2>Meeting Code: {meetingCode}</h2>
 
+      {notification && (
+        <div 
+          style={{
+            background: "#eee",
+            padding: "10px",
+            marginBottom: "10px",
+            borderRadius: "5px",
+          }}
+          >
+            {notification}
+            </div>
+      )}
+
       <button onClick={startScreenShare}>
         Share Screen
+      </button>
+
+      <button onClick={toggleMute}>
+        {isMuted ? "🎤 Unmute": "🔇 Mute"}
       </button>
 
       <button onClick={startTranscription}>
@@ -429,7 +619,32 @@ const VideoCall = () => {
         }}
         >
 
+          <div
+           style={{
+            border: "1px solid gray",
+            padding: "10px",
+            marginBottom: "20px",
+           }}
+          >
+
+            <h3>
+              Participants ({participants.length})
+            </h3>
+
+            {participants.map((participant) => (
+              <li key={participant}>
+                🟢 Online - {participant.slice(0, 6)}
+                </li>
+            ))}
+
+        </div>
+
+
+
           <h3>Meeting chat</h3>
+
+          <p>{typingUser}</p>
+          
 
           <div
             style={{
@@ -446,7 +661,15 @@ const VideoCall = () => {
 
             <input
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+
+
+                socket.emit(
+                  "typing",
+                  meetingCode
+                );
+              }}
               placeholder="Type message"
               />
 
@@ -472,11 +695,14 @@ const VideoCall = () => {
         ref={remoteVideoRef}
         autoPlay
         playsInline
+        controls={false}
         width={400}
         height={300}
         style={{
-        border: "2px solid red",
-        background: "black",
+          width: "400px",
+          height: "300px",
+          border: "2px solid red",
+          background: "black",
       }}
       />
     </div>

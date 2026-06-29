@@ -9,6 +9,7 @@ interface Meeting {
     recordings?: string;
     summary?: string;
     actionItems?: string[];
+    transcript?: string;
 }
 
   const MeetingHistory = () => {
@@ -94,13 +95,37 @@ interface Meeting {
                     <strong>Action Items:</strong>
                 </p>
 
-                <ul>
-                    {meeting.actionItems?.map(
-                        (item, index) => (
-                            <li key={index}>{item}</li>
-                        )
-                    )}
-                </ul>
+                {meeting.actionItems &&
+                meeting.actionItems.length > 0 ? (
+                    <ul>
+                        {meeting.actionItems.map(
+                            (item, index) => (
+                                <li key={index}>{item}</li>
+                            )
+                        )}
+                    </ul>
+                ) : (
+                    <p>No action items</p>
+
+                )}
+
+                
+            
+                    
+
+                <p>
+                    <strong>Transcript:</strong>
+                </p>
+
+                <div
+                 style={{
+                    background: "#f5f5f5",
+                    padding: "10px",
+                    borderRadius: "5px",
+                 }}
+                 >
+                    {meeting.transcript || "No transcript"}
+                </div>
                 </div>
 
 

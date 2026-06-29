@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import Meeting from "../models/Meeting";
 import { v4 as uuidv4 } from "uuid";
+import { generateMeetingSummary } from "../services/openaiService";
+import Task from "../models/Task";
+import { generateMeetingPDF } from "../services/pdfService";
 
 // CREATE MEETING
 export const createMeeting = async (req: any, res: Response) => {
@@ -74,6 +77,7 @@ export const deleteMeeting = async (req: Request, res: Response) => {
   }
 };
 
+//generateSummary
 export const generateSummary = async (
   req: Request,
   res: Response
@@ -92,25 +96,32 @@ export const generateSummary = async (
       });
     }
 
-    // Temporary AI Logic
-    const summary = 
-    transcript.length > 100
-     ? transcript.substring(0, 100) + "..."
-     : transcript;
+    console.log("TRANSCRIPT:", transcript);
 
-     console.log("TRANSCRIPT:", transcript);
+    const aiResult = 
+      await generateMeetingSummary(
+        transcript
+      );
 
-     const actionItems = transcript
-      .split(".")
-      .map((item: string) => item.trim())
-      .filter(
-       (item: string) => 
-        item.toLowerCase().includes("will")
-     );
+      const summary = 
+        aiResult.summary;
+
+      const actionItems =
+        aiResult.actionItems;
+       
 
      meeting.transcript = transcript;
      meeting.summary =  summary;
      meeting.actionItems = actionItems;
+     
+
+     for (const item of actionItems) {
+      await Task.create({
+        title: item,
+        assignee: "Unassigned",
+        status: "Todo",
+      });
+     }
 
      await meeting.save();
 
@@ -119,7 +130,7 @@ export const generateSummary = async (
       transcript,
       actionItems,
      });
-  } catch (error) {
+     } catch (error) {
     console.log(error);
 
     res.status(500).json({
@@ -127,3 +138,94 @@ export const generateSummary = async (
     });
   }
 };
+
+//getDashboard
+export const getDashboardStats = async (
+  req: Request,
+  res: Response 
+) => {
+  try {
+    const totalMeetings = await Meeting.countDocuments();
+
+    const completedMeetings = 
+     await Meeting.countDocuments({
+      summary: { $ne: ""},
+     });
+
+     const totalTasks = 
+      await Task.countDocuments();
+
+     const completedTasks = 
+      await Task.countDocuments({
+        status: "Todo",
+      });
+
+      res.json({
+        totalMeetings,
+        completedMeetings,
+        totalTasks,
+        completedTasks,
+      });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to load dashboard",
+    });
+  }
+};
+
+//meetingSummary
+export const getMeetingSummary = async (
+  req: Request,
+  res: Response
+     ) => {
+      try {
+        const meeting = await Meeting.findById(
+          req.params.id
+        );
+
+        if (!meeting) {
+          return res.status(404).json({
+            message: "Meeting not found",
+          });
+        }
+
+        res.json({
+          title: meeting.title,
+          summary: meeting.summary,
+          transcript: meeting.transcript,
+          actionItems: meeting.actionItems,
+          createdAt: meeting.createdAt,
+        });
+      
+     } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        message: "Error fetching summary",
+      });
+     }
+    };
+
+    export const downloadMeetingPDF = 
+     async (
+      req: Request,
+      res: Response
+     ) => {
+
+      const meeting = 
+        await Meeting.findById(
+          req.params.id
+        );
+
+        if (!meeting) {
+          return res.status(404).json({
+            message: "Meeting not found",
+          });
+        }
+
+        generateMeetingPDF(
+          meeting,
+          res
+        );
+     };
+  
